@@ -1,0 +1,88 @@
+<?php
+
+/**
+ * @file
+ * custom dashboard functionality
+ */
+
+function dining_balances_plans() {
+  global $user;
+
+  $account = user_load($user->uid);
+  if (isset($account->field_cbord_id[LANGUAGE_NONE])) {
+    $uuid = $account->field_cbord_id[LANGUAGE_NONE][0]['value'];
+  } else {
+    $uuid = custom_user_get_rinfo($user->name);
+
+    $account->field_cbord_id[LANGUAGE_NONE][0]['value'] = $uuid['uuid'];
+    $account = user_save($account);
+  }
+
+  $balances = dining_balances_pcs_call($uuid);
+
+  if ($balances) {
+
+    return array('#markup' => '<div class="dashboard-dining-balances"> 
+      <span class="label-campus-cash">Campus Cash Balance:</span> $' . $balances['campus_cash'] . 
+      '<br /><span class="label-meal-plan">Meal Plan Balance:</span> ' . $balances['meal_plan'] . 
+      '<br /><span class="label-munch-money">Munch Money Balance:</span> $' . $balances['munch_money'] .
+      '</div>');
+
+  } else {
+    return;
+  }
+}
+
+// Get dining balances, using CBORD ID, from PCS.
+function dining_balances_pcs_call($uuid) {
+
+  if (isset($uuid)) {
+    $balances = file_get_contents('https://hdsws.colorado.edu/pcs/inquire/' . $uuid);
+    $balance_array = explode('},{', trim($balances, '[{}]'));
+
+    foreach ($balance_array as $key => $value) {
+      switch ($key) {
+        case 0:
+          $cc_value = dining_balances_get_balance($value);
+        break;
+
+        case 2:
+          $mp_value = dining_balances_get_balance($value);
+        break;
+
+        case 3:
+          $mm_value = dining_balances_get_balance($value);
+        break;
+      }
+    }
+
+    return array('campus_cash' => $cc_value, 'meal_plan' => $mp_value, 'munch_money' => $mm_value);
+  } else {
+    return;
+  }
+
+}
+
+// Format balances returned by PCS call and return them to the block
+function dining_balances_get_balance($value) {
+
+  $value_array = explode(':', $value);
+
+  $balance_string = explode(',', $value_array[3]);
+  $balance = trim($balance_string[0], '"');
+
+  if ($value_array[1] != '"MEAL PLAN","Blocked"') {
+    if (ctype_digit($balance)) {
+      return $balance = $balance . '.00';
+    } else {
+      if (substr($balance, -3,1) == '.'){
+        return $balance;
+      } else {
+        return $balance = $balance . '0';
+      }
+    }
+  } else {
+    return $balance;
+  }
+
+}

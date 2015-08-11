@@ -1,0 +1,7 @@
+name = Dining Balances
+description = Dashboard get dining balances
+core = 7.x
+package = OnCampus
+
+dependencies[] = myroom_starrez
+dependencies[] = custom_user
